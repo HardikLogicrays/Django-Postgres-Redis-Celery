@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+
+  redis:
+    image: redis:alpine
+    container_name: cache
+
+  db:
+    image: postgres
+    container_name: database
+
+    environment:
+      - POSTGRES_DB=os.environ['POSTGRES_DB']
+      - POSTGRES_USER=os.environ['POSTGRES_USER']
+      - POSTGRES_PASSWORD=os.environ['POSTGRES_PASSWORD']
+
+  web:
+    build: .
+    container_name: website
+    ports:
+      - "8080:8000"
+
+    command: >
+      sh -c "python3 manage.py makemigrations test_app &&
+             python manage.py migrate test_app &&
+             python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+    depends_on:
+      - db
+
+
+  celery:
+    restart: always
+    build:
+      context: .
+    container_name: celery
+
+    command: celery -A test_app worker -l INFO
+
+    depends_on:
+      - db
+      - redis
+      - web
